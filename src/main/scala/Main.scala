@@ -1,6 +1,8 @@
 import java.nio.charset.Charset
 import java.nio.file.{Files, Paths}
 
+import fr.janalyse.ssh.{SSH, SSHShell}
+
 /**
  * Created by cloud on 14-10-21.
  */
@@ -10,20 +12,32 @@ object Main extends App {
   val username = "root"
   val password = "zjuvlis"
   val cluster = Seq(
-    Node("master", username, password),
-    Node("slave1", username, password),
-    Node("slave2", username, password),
-    Node("slave3", username, password)
+    SSHNode("master", username, password),
+    SSHNode("slave1", username, password),
+    SSHNode("slave2", username, password),
+    SSHNode("slave3", username, password)
   )
 
-  noPasswordSSH(cluster)
+  //addHosts(cluster)
+  //noPasswordSSH(cluster)
 
-  def noPasswordSSH(cluster: Seq[Node]): Unit = {
+  def addHosts(cluster: Seq[SSHNode]): Unit = {
+    val hostsFileName = "hosts"
+    for (node <- cluster) {
+      node.once(_.send(hostsFileName))
+      node.shell { sh =>
+        sh.execute(s"cat $hostsFileName >> /etc/$hostsFileName")
+        sh.rm(hostsFileName)
+      }
+    }
+  }
+
+  def noPasswordSSH(cluster: Seq[SSHNode]): Unit = {
     val keysFileName = "authorized_keys"
     val keysFile = Paths.get(keysFileName)
     val keys = Files.newBufferedWriter(keysFile, Charset.forName("utf-8"))
     for (node <- cluster) {
-      jassh.SSH.shell(node.host, node.username, node.password) { sh =>
+      node.shell { sh =>
         import sh._
         cd(".ssh")
         rm(ls())
@@ -35,10 +49,19 @@ object Main extends App {
     }
     keys.flush()
     for (node <- cluster) {
-      jassh.SSH.once(node.host, node.username, node.password)(_.send(keysFileName, s".ssh/$keysFileName"))
+      node.once(_.send(keysFileName, s".ssh/$keysFileName"))
     }
     Files.delete(keysFile)
   }
 }
 
-case class Node(host: String, username: String, password: String)
+case class SSHNode(host: String, username: String, password: String) {
+
+  def once(withssh: SSH => Unit): Unit = {
+    jassh.SSH.once(host, username, password)(withssh)
+  }
+  
+  def shell(withsh: SSHShell => Unit): Unit = {
+    jassh.SSH.shell(host, username, password)(withsh)
+  }
+}
