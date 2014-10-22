@@ -1,8 +1,6 @@
 import java.nio.charset.Charset
 import java.nio.file.{Files, Paths}
 
-import fr.janalyse.ssh.{SSH, SSHShell}
-
 /**
  * Created by cloud on 14-10-21.
  */
@@ -52,16 +50,5 @@ object Main extends App {
       node.once(_.send(keysFileName, s".ssh/$keysFileName"))
     }
     Files.delete(keysFile)
-  }
-}
-
-case class SSHNode(host: String, username: String, password: String) {
-
-  def once(withssh: SSH => Unit): Unit = {
-    jassh.SSH.once(host, username, password)(withssh)
-  }
-  
-  def shell(withsh: SSHShell => Unit): Unit = {
-    jassh.SSH.shell(host, username, password)(withsh)
   }
 }
