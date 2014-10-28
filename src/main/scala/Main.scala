@@ -6,26 +6,24 @@ import java.nio.file.{Files, Paths}
  */
 object Main extends App {
 
-
-  val username = "root"
   val password = "zjuvlis"
   val cluster = Seq(
-    SSHNode("master", username, password),
-    SSHNode("slave1", username, password),
-    SSHNode("slave2", username, password),
-    SSHNode("slave3", username, password)
+    RootNode("master", password),
+    RootNode("slave1", password),
+    RootNode("slave2", password),
+    RootNode("slave3", password)
   )
 
   //addHosts(cluster)
   //noPasswordSSH(cluster)
-  //installJDK(Seq(SSHNode("slave1", username, password)))
-  println(getSoftwareFileName("jdk"))
+  addHosts(Seq(NormalNode("slave1", "cloud", "qwerty", password)))
+  //addHosts(Seq(RootNode("slave1", password)))
 
   def addHosts(cluster: Seq[SSHNode]): Unit = {
     val hostsFileName = "hosts"
     for (node <- cluster) {
       node.sendFile(Paths.get(hostsFileName))
-      node.ssh { sh =>
+      node.sshWithRootShell { sh =>
         sh.execute(s"cat $hostsFileName >> /etc/$hostsFileName")
         sh.rm(hostsFileName)
       }
@@ -56,7 +54,7 @@ object Main extends App {
     val jdkFileName = getSoftwareFileName("jdk")
     for (node <- cluster) {
       node.sendFile(Paths.get(s"software/$jdkFileName"), jdkFileName)
-      node.ssh { sh =>
+      node.sshWithRootShell { sh =>
         import sh._
         execute(s"tar xzf $jdkFileName -C /opt")
         val jdkDirName = ls("/opt").find(_.contains("jdk")).get
