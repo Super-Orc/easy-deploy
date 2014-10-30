@@ -15,7 +15,7 @@ trait SSHNode {
     jassh.SSH.shell(host, username, password)(withsh)
   }
 
-  def sshWithRootShell(withsh: SSHShell => Unit) = ssh(withsh)
+  def sshWithRootShell(withsh: (SSHShell, String) => Unit) = ssh(withsh(_, username))
 
   def sendFile(fromLocalFile: Path, remoteDestination: String): Unit = {
     println(s"$host: receiving file '${fromLocalFile.getFileName}' ...")
@@ -30,11 +30,11 @@ trait SSHNode {
 }
 
 case class NormalNode(host: String, username: String, password: String, rootPassword: String) extends SSHNode {
-  override def sshWithRootShell(withsh: SSHShell => Unit): Unit = {
+  override def sshWithRootShell(withsh: (SSHShell, String) => Unit): Unit = {
     val rootSh = (sh: SSHShell) => {
       sh.become("root", Some(rootPassword))
       sh.cd(s"/home/$username")
-      withsh(sh)
+      withsh(sh, username)
     }
     jassh.SSH.shell(host, username, password)(rootSh)
   }
