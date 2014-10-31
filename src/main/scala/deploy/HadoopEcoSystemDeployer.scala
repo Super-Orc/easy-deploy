@@ -15,6 +15,7 @@ object HadoopEcoSystemDeployer {
       nameNode: SSHNode,
       secondaryNameNode: SSHNode,
       HMaster: SSHNode,
+      sparkMaster: SSHNode,
       HDFSDataDir: Path,
       zooKeeperDataDir: Path): Unit = {
     addHosts(cluster)
@@ -24,6 +25,7 @@ object HadoopEcoSystemDeployer {
     installZooKeeper(cluster, zooKeeperDataDir)
     installHBase(cluster, HMaster, nameNode.host, zooKeeperDataDir, cluster.map(_.host))
     installKafka(cluster, cluster.map(_.host))
+    installSpark(cluster, sparkMaster)
   }
 
   def addHosts(cluster: Seq[SSHNode]): Unit = {
@@ -63,7 +65,7 @@ object HadoopEcoSystemDeployer {
 
   def installHadoop(cluster: Seq[SSHNode], master: SSHNode, secondMaster: SSHNode, dataDir: Path): Unit = {
     val dataDirName = dataDir.toAbsolutePath.toString
-    val slaves = cluster.map(_.host).mkString("", "\n", "\n")
+    val slaves = cluster.map(_.host).mkString("\n")
     val coreSite =
       s"""
         |<configuration>
@@ -207,6 +209,14 @@ object HadoopEcoSystemDeployer {
         sh.execute("bin/kafka-server-start.sh -daemon config/server.properties")
       }
     }
+  }
+
+  def installSpark(cluster: Seq[SSHNode], master: SSHNode): Unit = {
+    val slaves = cluster.map(_.host).mkString("\n")
+    unpackSoftware(cluster, "spark")((_, _) => (), _ => ())
+    val slavesFile = generateTempFile("slaves", slaves)
+    modifyRemoteFile(cluster, "/usr/local/spark/conf", false, slavesFile)
+    master.ssh(_.execute("/usr/local/spark/sbin/start-all.sh"))
   }
 
   private def prepareDataDir(dataDirName: String)(sh: SSHShell, username: String): Unit = {
