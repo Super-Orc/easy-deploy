@@ -1,3 +1,5 @@
+package deploy
+
 import java.nio.file.Path
 
 import fr.janalyse.ssh.SSHShell
@@ -7,19 +9,20 @@ import fr.janalyse.ssh.SSHShell
  */
 
 trait SSHNode {
+  def ip: String
   def host: String
   def username: String
   def password: String
 
   def ssh(withsh: SSHShell => Unit): Unit = {
-    jassh.SSH.shell(host, username, password)(withsh)
+    jassh.SSH.shell(ip, username, password)(withsh)
   }
 
   def sshWithRootShell(withsh: (SSHShell, String) => Unit) = ssh(withsh(_, username))
 
   def sendFile(fromLocalFile: Path, remoteDestination: String): Unit = {
     println(s"$host: receiving file '${fromLocalFile.getFileName}' ...")
-    jassh.SSH.once(host, username, password) { ssh =>
+    jassh.SSH.once(ip, username, password) { ssh =>
       ssh.rm(remoteDestination)
       ssh.send(fromLocalFile.toString, remoteDestination)
     }
@@ -29,17 +32,17 @@ trait SSHNode {
   def sendFile(fromLocalFile: Path): Unit = sendFile(fromLocalFile, fromLocalFile.getFileName.toString)
 }
 
-case class NormalNode(host: String, username: String, password: String, rootPassword: String) extends SSHNode {
+case class NormalNode(ip: String, host: String, username: String, password: String, rootPassword: String) extends SSHNode {
   override def sshWithRootShell(withsh: (SSHShell, String) => Unit): Unit = {
     val rootSh = (sh: SSHShell) => {
       sh.become("root", Some(rootPassword))
       sh.cd(s"/home/$username")
       withsh(sh, username)
     }
-    jassh.SSH.shell(host, username, password)(rootSh)
+    ssh(rootSh)
   }
 }
 
-case class RootNode(host: String, password: String) extends SSHNode {
+case class RootNode(ip: String, host: String, password: String) extends SSHNode {
   def username = "root"
 }
