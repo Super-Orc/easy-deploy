@@ -21,5 +21,5 @@ object Main extends App {
   val HDFSDataDir = Paths.get("/home/hadoop/dfs")
   val zooKeeperDataDir = Paths.get("/home/hadoop/zookeeper")
 
-  HadoopEcoSystemDeployer.deploy(cluster, nameNode, secondaryNameNode, HMaster, sparkMaster, HDFSDataDir, zooKeeperDataDir)
+  HadoopEcoSystemDeployer.deploy(cluster, false, nameNode, secondaryNameNode, HMaster, sparkMaster, HDFSDataDir, zooKeeperDataDir)
 }

@@ -12,13 +12,14 @@ object HadoopEcoSystemDeployer {
 
   def deploy(
       cluster: Seq[SSHNode],
+      overwriteHostsFile: Boolean,
       nameNode: SSHNode,
       secondaryNameNode: SSHNode,
       HMaster: SSHNode,
       sparkMaster: SSHNode,
       HDFSDataDir: Path,
       zooKeeperDataDir: Path): Unit = {
-    addHosts(cluster)
+    addHosts(cluster, overwriteHostsFile)
     noPasswordSSH(cluster)
     installJDK(cluster)
     installHadoop(cluster, nameNode, secondaryNameNode, HDFSDataDir)
@@ -28,9 +29,10 @@ object HadoopEcoSystemDeployer {
     installSpark(cluster, sparkMaster)
   }
 
-  def addHosts(cluster: Seq[SSHNode]): Unit = {
-    val hostsFile = generateTempFile("hosts", cluster.map(node => s"${node.ip} ${node.host}").mkString("\n"))
-    modifyRemoteFile(cluster, "/etc", true, hostsFile)
+  def addHosts(cluster: Seq[SSHNode], overwrite: Boolean): Unit = {
+    val hosts = cluster.map(node => s"${node.ip} ${node.host}").mkString("\n", "\n", "\n")
+    val hostsFile = generateTempFile("hosts", if (overwrite) "127.0.0.1 localhost" + hosts else hosts)
+    modifyRemoteFile(cluster, "/etc", !overwrite, hostsFile)
   }
 
   def noPasswordSSH(cluster: Seq[SSHNode]): Unit = {
@@ -41,7 +43,7 @@ object HadoopEcoSystemDeployer {
       node.ssh { sh =>
         import sh._
         cd(".ssh")
-        rm(ls())
+        execute("rm -rf ./*")
         execute("""ssh-keygen -t rsa -N "" -f id_rsa""")
         execute("echo 'StrictHostKeyChecking no' > config")
         keys.write(cat("id_rsa.pub"))
