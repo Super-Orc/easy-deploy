@@ -275,6 +275,7 @@ object HadoopEcoSystemDeployer {
 
     val softwareFileName = getSoftwareFileName(keyword)
     for (node <- cluster) {
+      println(s"install $keyword to ${node.host} ...")
       node.sendFile(Paths.get(s"software/$softwareFileName"), softwareFileName)
       node.sshWithRootShell { (sh, username) =>
         import sh._
@@ -291,6 +292,7 @@ object HadoopEcoSystemDeployer {
         withRootShell(sh, username)
       }
       node.ssh(withNormalShell)
+      println(s"install $keyword to ${node.host} done")
     }
   }
 }

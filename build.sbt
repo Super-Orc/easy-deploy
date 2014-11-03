@@ -4,6 +4,8 @@ version := "1.0"
 
 scalaVersion := "2.11.2"
 
+offline := true
+
 resolvers += "JAnalyse Repository" at "http://www.janalyse.fr/repository/"
 
 libraryDependencies ++= Seq(

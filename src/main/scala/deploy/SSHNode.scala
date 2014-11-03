@@ -21,12 +21,10 @@ trait SSHNode {
   def sshWithRootShell(withsh: (SSHShell, String) => Unit) = ssh(withsh(_, username))
 
   def sendFile(fromLocalFile: Path, remoteDestination: String): Unit = {
-    println(s"$host: receiving file '${fromLocalFile.getFileName}' ...")
     jassh.SSH.once(ip, username, password) { ssh =>
       ssh.rm(remoteDestination)
       ssh.send(fromLocalFile.toString, remoteDestination)
     }
-    println(s"$host: finished")
   }
 
   def sendFile(fromLocalFile: Path): Unit = sendFile(fromLocalFile, fromLocalFile.getFileName.toString)

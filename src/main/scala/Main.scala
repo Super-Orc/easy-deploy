@@ -14,6 +14,7 @@ object Main extends App {
     RootNode("10.214.208.14", "slave3", pwd)
   )
 
+  val overwriteHostsFile = false
   val nameNode = cluster.head
   val secondaryNameNode = cluster.take(2).last
   val HMaster = secondaryNameNode
@@ -21,5 +22,5 @@ object Main extends App {
   val HDFSDataDir = Paths.get("/home/hadoop/dfs")
   val zooKeeperDataDir = Paths.get("/home/hadoop/zookeeper")
 
-  HadoopEcoSystemDeployer.deploy(cluster, false, nameNode, secondaryNameNode, HMaster, sparkMaster, HDFSDataDir, zooKeeperDataDir)
+  HadoopEcoSystemDeployer.deploy(cluster, overwriteHostsFile, nameNode, secondaryNameNode, HMaster, sparkMaster, HDFSDataDir, zooKeeperDataDir)
 }
