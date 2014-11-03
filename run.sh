@@ -1,1 +1,1 @@
-sbt/bin/sbt -ivy ./dependency/ -sbt-boot ./sbt/boot run
+sbt/bin/sbt -ivy ./sbt/dependency/ -sbt-boot ./sbt/boot run
