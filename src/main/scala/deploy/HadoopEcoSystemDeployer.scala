@@ -269,7 +269,8 @@ object HadoopEcoSystemDeployer {
       stream.iterator.asScala
         .filter(Files.isRegularFile(_))
         .map(_.getFileName.toString)
-        .find(_.contains(keyword)).get
+        .filter(_.contains(keyword))
+        .minBy(_.size)
     }
 
     val softwareFileName = getSoftwareFileName(keyword)
