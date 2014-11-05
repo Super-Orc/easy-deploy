@@ -89,6 +89,10 @@ object HadoopEcoSystemDeployer {
         |    <value>3</value>
         |  </property>
         |  <property>
+        |    <name>dfs.permissions.enabled</name>
+        |    <value>false</value>
+        |  </property>
+        |  <property>
         |    <name>dfs.namenode.secondary.http-address</name>
         |    <value>${secondMaster.host}:50090</value>
         |  </property>
