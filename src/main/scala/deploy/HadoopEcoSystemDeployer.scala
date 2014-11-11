@@ -30,6 +30,11 @@ object HadoopEcoSystemDeployer {
   }
 
   def addHosts(cluster: Seq[SSHNode], overwrite: Boolean): Unit = {
+    for (node <- cluster) {
+      node.sshWithRootShell { (sh, _) =>
+        sh.execute(s"hostname ${node.host}")
+      }
+    }
     val hosts = cluster.map(node => s"${node.ip} ${node.host}").mkString("\n", "\n", "\n")
     val hostsFile = generateTempFile("hosts", if (overwrite) "127.0.0.1 localhost" + hosts else hosts)
     modifyRemoteFile(cluster, "/etc", !overwrite, hostsFile)
@@ -42,8 +47,9 @@ object HadoopEcoSystemDeployer {
     for (node <- cluster) {
       node.ssh { sh =>
         import sh._
+        execute("rm -rf .ssh")
+        execute("mkdir .ssh")
         cd(".ssh")
-        execute("rm -rf ./*")
         execute("""ssh-keygen -t rsa -N "" -f id_rsa""")
         execute("echo 'StrictHostKeyChecking no' > config")
         keys.write(cat("id_rsa.pub"))
