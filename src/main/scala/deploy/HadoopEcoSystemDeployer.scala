@@ -12,7 +12,6 @@ object HadoopEcoSystemDeployer {
 
   def deploy(
       cluster: Seq[SSHNode],
-      overwriteHostsFile: Boolean,
       nameNode: SSHNode,
       secondaryNameNode: SSHNode,
       HMaster: SSHNode,
@@ -21,6 +20,7 @@ object HadoopEcoSystemDeployer {
       zooKeeperDataDir: Path): Unit = {
     addHosts(cluster, overwriteHostsFile)
     noPasswordSSH(cluster)
+    disableFirewall(cluster)
     installJDK(cluster)
     installHadoop(cluster, nameNode, secondaryNameNode, HDFSDataDir)
     installZooKeeper(cluster, zooKeeperDataDir)
@@ -29,15 +29,15 @@ object HadoopEcoSystemDeployer {
     installSpark(cluster, sparkMaster, nameNode.host)
   }
 
-  def addHosts(cluster: Seq[SSHNode], overwrite: Boolean): Unit = {
+  def addHosts(cluster: Seq[SSHNode]: Unit = {
     for (node <- cluster) {
       node.sshWithRootShell { (sh, _) =>
         sh.execute(s"hostname ${node.host}")
       }
     }
     val hosts = cluster.map(node => s"${node.ip} ${node.host}").mkString("\n", "\n", "\n")
-    val hostsFile = generateTempFile("hosts", if (overwrite) "127.0.0.1 localhost" + hosts else hosts)
-    modifyRemoteFile(cluster, "/etc", !overwrite, hostsFile)
+    val hostsFile = generateTempFile("hosts", "127.0.0.1 localhost" + hosts)
+    modifyRemoteFile(cluster, "/etc", false, hostsFile)
   }
 
   def noPasswordSSH(cluster: Seq[SSHNode]): Unit = {
@@ -58,6 +58,15 @@ object HadoopEcoSystemDeployer {
     }
     keys.close()
     modifyRemoteFile(cluster, ".ssh", false, keysFile)
+  }
+
+  def disableFirewall(cluster: Seq[SSHNode]): Unit = {
+    for (node <- cluster) {
+      node.sshWithRootShell { sh =>
+        sh.execute("systemctl stop firewalld.service")
+        sh.execute("systemctl disable firewalld.service")
+      }
+    }
   }
 
   def installJDK(cluster: Seq[SSHNode]): Unit = {
@@ -130,6 +139,7 @@ object HadoopEcoSystemDeployer {
       cd("/usr/local/hadoop")
       execute("bin/hdfs namenode -format")
       execute("sbin/start-dfs.sh")
+      execute("bin/hdfs dfsadmin -safemode leave")
     }
   }
 
@@ -167,10 +177,6 @@ object HadoopEcoSystemDeployer {
         |  <property>
         |    <name>hbase.cluster.distributed</name>
         |    <value>true</value>
-        |  </property>
-        |  <property>
-        |    <name>hbase.rootdir</name>
-        |    <value>hdfs://$nameNode:9000/hbase</value>
         |  </property>
         |  <property>
         |    <name>hbase.rootdir</name>
