@@ -62,10 +62,17 @@ object HadoopEcoSystemDeployer {
 
   def disableFirewall(cluster: Seq[SSHNode]): Unit = {
     for (node <- cluster) {
+      val commands = getLinuxDistributionAndVersion(node) match {
+        case ("centos", version) =>
+          if (version.startsWith("7")) {
+            Seq("systemctl stop firewalld.service", "systemctl disable firewalld.service")
+          } else {
+            Seq("service iptables stop", "chkconfig iptables off")
+          }
+        case ("ubuntu", _) => Seq("ufw disable")
+      }
       node.sshWithRootShell { sh =>
-        sh.execute("service iptables stop")
-        sh.execute("systemctl stop firewalld.service")
-        sh.execute("systemctl disable firewalld.service")
+        commands.foreach(c => sh.execute(c))
       }
     }
   }
@@ -241,6 +248,13 @@ object HadoopEcoSystemDeployer {
     val sparkDefaultsFile = generateTempFile("spark-defaults.conf", sparkDefaults)
     modifyRemoteFile(cluster, "/usr/local/spark/conf", false, sparkDefaultsFile)
     master.ssh(_.execute("/usr/local/spark/sbin/start-all.sh"))
+  }
+
+  def getLinuxDistributionAndVersion(node: SSHNode) = {
+    val platform = """Linux.*-with-(\w+)-(\d[0-9.]*).*""".r
+    node.ssh(_.execute("python -mplatform")) match {
+      case platform(distribution, version) => distribution.toLowerCase -> version
+    }
   }
 
   private def prepareDataDir(dataDirName: String, sh: SSHShell, username: String): Unit = {

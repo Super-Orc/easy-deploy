@@ -16,8 +16,8 @@ object Main extends App {
 
   val nameNode = cluster.head
   val secondaryNameNode = cluster.take(2).last
-  val HMaster = secondaryNameNode
-  val sparkMaster = cluster.take(3).last
+  val HMaster = nameNode
+  val sparkMaster = nameNode
   val HDFSDataDir = Paths.get("/home/hadoop/dfs")
   val zooKeeperDataDir = Paths.get("/home/hadoop/zookeeper")
 

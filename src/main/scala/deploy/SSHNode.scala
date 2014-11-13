@@ -14,13 +14,13 @@ trait SSHNode {
   def username: String
   def password: String
 
-  def ssh(withsh: SSHShell => Unit): Unit = {
+  def ssh[T](withsh: SSHShell => T): T = {
     jassh.SSH.shell(ip, username, password)(withsh)
   }
 
-  def sshWithRootShell(withsh: (SSHShell, String) => Unit): Unit = ssh(withsh(_, username))
+  def sshWithRootShell[T](withsh: (SSHShell, String) => T): T = ssh(withsh(_, username))
 
-  def sshWithRootShell(withsh: SSHShell => Unit): Unit = sshWithRootShell{(sh, _) => withsh(sh)}
+  def sshWithRootShell[T](withsh: SSHShell => T): T = sshWithRootShell{(sh, _) => withsh(sh)}
 
   def sendFile(fromLocalFile: Path, remoteDestination: String): Unit = {
     jassh.SSH.once(ip, username, password) { ssh =>
@@ -33,7 +33,7 @@ trait SSHNode {
 }
 
 case class NormalNode(ip: String, host: String, username: String, password: String, rootPassword: String) extends SSHNode {
-  override def sshWithRootShell(withsh: (SSHShell, String) => Unit): Unit = {
+  override def sshWithRootShell[T](withsh: (SSHShell, String) => T): T = {
     val rootSh = (sh: SSHShell) => {
       sh.become("root", Some(rootPassword))
       sh.cd(s"/home/$username")
