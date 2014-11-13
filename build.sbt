@@ -2,7 +2,7 @@ name := "easy deploy tool for hadoop ecosystem"
 
 version := "1.0"
 
-scalaVersion := "2.11.2"
+scalaVersion := "2.11.4"
 
 offline := true
 

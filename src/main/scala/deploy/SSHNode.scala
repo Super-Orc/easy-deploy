@@ -18,7 +18,9 @@ trait SSHNode {
     jassh.SSH.shell(ip, username, password)(withsh)
   }
 
-  def sshWithRootShell(withsh: (SSHShell, String) => Unit) = ssh(withsh(_, username))
+  def sshWithRootShell(withsh: (SSHShell, String) => Unit): Unit = ssh(withsh(_, username))
+
+  def sshWithRootShell(withsh: SSHShell => Unit): Unit = sshWithRootShell{(sh, _) => withsh(sh)}
 
   def sendFile(fromLocalFile: Path, remoteDestination: String): Unit = {
     jassh.SSH.once(ip, username, password) { ssh =>

@@ -18,7 +18,7 @@ object HadoopEcoSystemDeployer {
       sparkMaster: SSHNode,
       HDFSDataDir: Path,
       zooKeeperDataDir: Path): Unit = {
-    addHosts(cluster, overwriteHostsFile)
+    addHosts(cluster)
     noPasswordSSH(cluster)
     disableFirewall(cluster)
     installJDK(cluster)
@@ -29,9 +29,9 @@ object HadoopEcoSystemDeployer {
     installSpark(cluster, sparkMaster, nameNode.host)
   }
 
-  def addHosts(cluster: Seq[SSHNode]: Unit = {
+  def addHosts(cluster: Seq[SSHNode]): Unit = {
     for (node <- cluster) {
-      node.sshWithRootShell { (sh, _) =>
+      node.sshWithRootShell { sh =>
         sh.execute(s"hostname ${node.host}")
       }
     }
@@ -63,6 +63,7 @@ object HadoopEcoSystemDeployer {
   def disableFirewall(cluster: Seq[SSHNode]): Unit = {
     for (node <- cluster) {
       node.sshWithRootShell { sh =>
+        sh.execute("service iptables stop")
         sh.execute("systemctl stop firewalld.service")
         sh.execute("systemctl disable firewalld.service")
       }
@@ -70,15 +71,12 @@ object HadoopEcoSystemDeployer {
   }
 
   def installJDK(cluster: Seq[SSHNode]): Unit = {
-    unpackSoftware(cluster, "jdk")((sh, _) => {
-      sh.execute("echo 'export JAVA_HOME=/usr/local/jdk\nPATH=$JAVA_HOME/bin:$PATH' >> /etc/profile")
-    }, sh => ())
+    unpackSoftware(
+      cluster,
+      "jdk",
+      _.execute("echo 'export JAVA_HOME=/usr/local/jdk\nPATH=$JAVA_HOME/bin:$PATH' >> /etc/profile"),
+      _ => ())
   }
-
-  private val xmlHeader =
-    """|<?xml version="1.0" encoding="UTF-8"?>
-       |<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
-    """.stripMargin
 
   def installHadoop(cluster: Seq[SSHNode], master: SSHNode, secondMaster: SSHNode, dataDir: Path): Unit = {
     val dataDirName = dataDir.toAbsolutePath.toString
@@ -123,7 +121,7 @@ object HadoopEcoSystemDeployer {
       """.stripMargin
 
     val configDir = "/usr/local/hadoop/etc/hadoop"
-    unpackSoftware(cluster, "hadoop")(prepareDataDir(dataDirName), sh => {
+    unpackSoftware(cluster, "hadoop", prepareDataDir(dataDirName, _, _), sh => {
       import sh._
       cd(configDir)
       execute("""sed -i "25s#\${JAVA_HOME}#$JAVA_HOME#" hadoop-env.sh""")
@@ -147,7 +145,7 @@ object HadoopEcoSystemDeployer {
     val dataDirName = dataDir.toAbsolutePath.toString
     val serverNames = cluster.map(_.host)
     val configDir = "/usr/local/zookeeper/conf"
-    unpackSoftware(cluster, "zookeeper")(prepareDataDir(dataDirName), sh => {
+    unpackSoftware(cluster, "zookeeper", prepareDataDir(dataDirName, _, _), sh => {
       import sh._
       cd(configDir)
       execute("mv zoo_sample.cfg zoo.cfg")
@@ -193,7 +191,7 @@ object HadoopEcoSystemDeployer {
         |</configuration>
       """.stripMargin
     val configDir = "/usr/local/hbase/conf"
-    unpackSoftware(cluster, "hbase")((_, _) => (), sh => {
+    unpackSoftware(cluster, "hbase", _ => (), sh => {
       import sh._
       cd(configDir)
       execute("echo 'export HBASE_MANAGES_ZK=false' >> hbase-env.sh")
@@ -211,7 +209,7 @@ object HadoopEcoSystemDeployer {
   def installKafka(cluster: Seq[SSHNode], zooKeeperCluster: Seq[String]): Unit = {
     val serverNames = cluster.map(_.host)
     val configDir = "/usr/local/kafka/config"
-    unpackSoftware(cluster, "kafka")((_, _) => (), sh => {
+    unpackSoftware(cluster, "kafka", _ => (), sh => {
       import sh._
       cd(configDir)
       execute(s"sed -i '20s#.*#broker.id=${serverNames.indexOf(sh.hostname)}#' server.properties")
@@ -230,7 +228,7 @@ object HadoopEcoSystemDeployer {
   }
 
   def installSpark(cluster: Seq[SSHNode], master: SSHNode, namenode: String): Unit = {
-    unpackSoftware(cluster, "spark")((_, _) => (), _ => ())
+    unpackSoftware(cluster, "spark", _ => (), _ => ())
     val slaves = cluster.map(_.host).mkString("\n")
     val slavesFile = generateTempFile("slaves", slaves)
     modifyRemoteFile(cluster, "/usr/local/spark/conf", false, slavesFile)
@@ -245,7 +243,7 @@ object HadoopEcoSystemDeployer {
     master.ssh(_.execute("/usr/local/spark/sbin/start-all.sh"))
   }
 
-  private def prepareDataDir(dataDirName: String)(sh: SSHShell, username: String): Unit = {
+  private def prepareDataDir(dataDirName: String, sh: SSHShell, username: String): Unit = {
     import sh._
     if (exists(dataDirName)) {
       execute(s"rm -rf $dataDirName/*")
@@ -273,7 +271,7 @@ object HadoopEcoSystemDeployer {
         val remoteDestination = s"$remoteDir/$localFileName"
         if (isAppend) {
           node.sendFile(localFile)
-          node.sshWithRootShell { (sh, _) =>
+          node.sshWithRootShell { sh =>
             sh.execute(s"cat $localFileName >> $remoteDestination")
             sh.rm(localFileName)
           }
@@ -285,8 +283,11 @@ object HadoopEcoSystemDeployer {
     localFiles.foreach(Files.delete)
   }
 
-  private def unpackSoftware(cluster: Seq[SSHNode], keyword: String)
-                            (withRootShell: (SSHShell, String) => Unit, withNormalShell: SSHShell => Unit): Unit = {
+  private def unpackSoftware(
+              cluster: Seq[SSHNode],
+              keyword: String,
+              withRootShell: (SSHShell, String) => Unit,
+              withNormalShell: SSHShell => Unit): Unit = {
     def getSoftwareFileName(keyword: String) = {
       import scala.collection.JavaConverters._
       val stream = Files.newDirectoryStream(Paths.get("software"))
@@ -319,4 +320,19 @@ object HadoopEcoSystemDeployer {
       println(s"install $keyword to ${node.host} done")
     }
   }
+
+  private def unpackSoftware(
+              cluster: Seq[SSHNode],
+              keyword: String,
+              withRootShell: SSHShell => Unit,
+              withNormalShell: SSHShell => Unit): Unit = {
+    unpackSoftware(cluster, keyword, (sh, _) => withRootShell(sh), withNormalShell)
+  }
+
+  private val xmlHeader =
+    """|<?xml version="1.0" encoding="UTF-8"?>
+       |<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+    """.stripMargin
+
+  private val emptyShellFunction = (sh: SSHShell) => ()
 }
