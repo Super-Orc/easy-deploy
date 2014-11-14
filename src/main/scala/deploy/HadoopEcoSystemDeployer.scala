@@ -10,6 +10,8 @@ import fr.janalyse.ssh.SSHShell
  */
 object HadoopEcoSystemDeployer {
 
+  val deployDir = "/opt/Titans"
+
   def deploy(
       cluster: Seq[SSHNode],
       nameNode: SSHNode,
@@ -21,6 +23,7 @@ object HadoopEcoSystemDeployer {
     addHosts(cluster)
     noPasswordSSH(cluster)
     disableFirewall(cluster)
+    clean(cluster)
     installJDK(cluster)
     installHadoop(cluster, nameNode, secondaryNameNode, HDFSDataDir)
     installZooKeeper(cluster, zooKeeperDataDir)
@@ -64,15 +67,28 @@ object HadoopEcoSystemDeployer {
     for (node <- cluster) {
       val commands = getLinuxDistributionAndVersion(node) match {
         case ("centos", version) =>
-          if (version.startsWith("7")) {
-            Seq("systemctl stop firewalld.service", "systemctl disable firewalld.service")
-          } else {
-            Seq("service iptables stop", "chkconfig iptables off")
+          Seq(
+            "setenforce 0",
+            "sed -i 's#SELINUX=.*#SELINUX=disabled#' /etc/selinux/config") ++ {
+            if (version.startsWith("7")) {
+              Seq("systemctl stop firewalld.service", "systemctl disable firewalld.service")
+            } else {
+              Seq("service iptables stop", "chkconfig iptables off")
+            }
           }
         case ("ubuntu", _) => Seq("ufw disable")
       }
       node.sshWithRootShell { sh =>
         commands.foreach(c => sh.execute(c))
+      }
+    }
+  }
+
+  def clean(cluster: Seq[SSHNode]): Unit = {
+    for (node <- cluster) {
+      node.sshWithRootShell { sh =>
+        sh.execute(s"rm -rf $deployDir")
+        sh.execute(s"mkdir -p $deployDir")
       }
     }
   }
@@ -252,7 +268,7 @@ object HadoopEcoSystemDeployer {
 
   def getLinuxDistributionAndVersion(node: SSHNode) = {
     val platform = """Linux.*-with-(\w+)-(\d[0-9.]*).*""".r
-    node.ssh(_.execute("python -mplatform")) match {
+    node.ssh(_.execute("python -mplatform").trim) match {
       case platform(distribution, version) => distribution.toLowerCase -> version
     }
   }
@@ -318,15 +334,11 @@ object HadoopEcoSystemDeployer {
       node.sendFile(Paths.get(s"software/$softwareFileName"), softwareFileName)
       node.sshWithRootShell { (sh, username) =>
         import sh._
-        ls("/tmp").filter(_.contains(keyword)).foreach(f => execute(s"rm -rf /tmp/$f"))
-        execute(s"tar xzf $softwareFileName -C /tmp")
-        val softwareDirName = ls("/tmp").find(_.contains(keyword)).get
-        execute(s"rm -rf /opt/$softwareDirName")
-        execute(s"cp -r /tmp/$softwareDirName /opt")
-        execute(s"rm -rf /tmp/$softwareDirName")
-        execute(s"chown -R $username.$username /opt/$softwareDirName")
+        execute(s"tar xzf $softwareFileName -C $deployDir")
+        val softwareDirName = ls(deployDir).find(_.contains(keyword)).get
+        execute(s"chown -R $username.$username $deployDir/$softwareDirName")
         execute(s"rm -f /usr/local/$keyword")
-        execute(s"ln -s /opt/$softwareDirName /usr/local/$keyword")
+        execute(s"ln -s $deployDir/$softwareDirName /usr/local/$keyword")
         rm(softwareFileName)
         withRootShell(sh, username)
       }
