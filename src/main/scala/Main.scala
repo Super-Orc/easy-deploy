@@ -1,6 +1,7 @@
 import java.nio.file.Paths
 
-import deploy.{RootNode, HadoopEcoSystemDeployer}
+import deploy.HadoopEcoSystemDeployer
+import deploy.util.SSHNode
 
 /**
  * Created by cloud on 14-10-21.
@@ -8,10 +9,7 @@ import deploy.{RootNode, HadoopEcoSystemDeployer}
 object Main extends App {
   val pwd = "zjuvlis"
   val cluster = Seq(
-    RootNode("10.214.208.11", "master", pwd),
-    RootNode("10.214.208.12", "slave1", pwd),
-    RootNode("10.214.208.13", "slave2", pwd),
-    RootNode("10.214.208.14", "slave3", pwd)
+    SSHNode("10.214.20.177", "fuck", "vlis", pwd)
   )
 
   val nameNode = cluster.head
@@ -20,6 +18,7 @@ object Main extends App {
   val sparkMaster = nameNode
   val HDFSDataDir = Paths.get("/home/hadoop/dfs")
   val zooKeeperDataDir = Paths.get("/home/hadoop/zookeeper")
+  val sparkDataDir = Paths.get("/home/hadoop/spark")
 
-  HadoopEcoSystemDeployer.deploy(cluster, nameNode, secondaryNameNode, HMaster, sparkMaster, HDFSDataDir, zooKeeperDataDir)
+  HadoopEcoSystemDeployer.deploy(cluster, nameNode, secondaryNameNode, HMaster, sparkMaster, HDFSDataDir, zooKeeperDataDir, sparkDataDir)
 }
