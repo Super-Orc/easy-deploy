@@ -91,10 +91,16 @@ object HadoopEcoSystemDeployer {
   }
 
   def installJDK(cluster: Seq[SSHNode]): Unit = {
+    val config =
+      """
+        |export JAVA_HOME=/usr/local/jdk
+        |PATH=$JAVA_HOME/bin:$PATH
+      |""".stripMargin
+    modifyRemoteFile(cluster, "/etc", true, true, generateTempFile("profile", config))
     unpackSoftware(
       cluster,
       "jdk",
-      _.sudo("echo 'export JAVA_HOME=/usr/local/jdk\nPATH=\\$JAVA_HOME/bin:$PATH' >> /etc/profile")
+      sh => ()
     )
   }
 
