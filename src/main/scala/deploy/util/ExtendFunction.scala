@@ -8,7 +8,7 @@ import fr.janalyse.ssh.SSHShell
 object ExtendFunction {
   implicit class ExtendedSSHShell(sh: SSHShell) {
     def sudo(command: String) = {
-      sh.execute(s"""echo $password | sudo -S sh -c "$command" """)
+      sh.execute(s"""echo $password | sudo -k -S sh -c "$command" """)
     }
 
     def username = sh.options.username
