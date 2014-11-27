@@ -49,7 +49,16 @@ object HadoopEcoSystemDeployer {
     val hosts = cluster.map(node => s"${node.ip} ${node.hostname}").mkString("\n", "\n", "\n")
     modifyRemoteFile(cluster, "/etc", true, true, generateTempFile("hosts", hosts))
     for (node <- cluster) {
-      node.ssh(_.sudo(s"hostname ${node.hostname}")) //TODO
+      node.ssh { sh =>
+        getLinuxDistributionAndVersion(node) match {
+          case ("centos", version) if !version.startsWith("7") =>
+            sh.sudo("sed -i '/^HOSTNAME=/d' /etc/sysconfig/network")
+            sh.sudo(s"echo 'HOSTNAME=${node.hostname}' >> /etc/sysconfig/network")
+            sh.sudo(s"hostname ${node.hostname}")
+          case ("ubuntu", _) | ("centos", _) =>
+            sh.sudo(s"hostnamectl set-hostname ${node.hostname}")
+        }
+      }
     }
     generateTempFile("hosts", hosts)
   }
