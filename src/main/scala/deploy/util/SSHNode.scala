@@ -8,9 +8,7 @@ import fr.janalyse.ssh.SSHShell
  * Created by cloud on 14-10-22.
  */
 case class SSHNode(ip: String, hostname: String, username: String, password: String) {
-  def ssh[T](withsh: SSHShell => T): T = {
-    jassh.SSH.shell(ip, username, password)(withsh)
-  }
+  def ssh[T](withsh: SSHShell => T): T = jassh.SSH.shell(ip, username, password)(withsh)
 
   def sendFile(localPath: Path, remotePath: String): Unit = {
     jassh.SSH.once(ip, username, password) { ssh =>
@@ -28,9 +26,7 @@ case class SSHNode(ip: String, hostname: String, username: String, password: Str
     localPath
   }
 
-  def getFile(remotePath: String, localFileName: String): Path = {
-    getFile(remotePath, Paths.get(localFileName))
-  }
+  def getFile(remotePath: String, localFileName: String): Path = getFile(remotePath, Paths.get(localFileName))
 
   def getFile(remotePath: String): Path = getFile(remotePath, Paths.get(remotePath).getFileName.toString)
 }
