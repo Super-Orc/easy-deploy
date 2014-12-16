@@ -274,7 +274,7 @@ object HadoopEcoSystemDeployer {
     val slaves = cluster.map(_.hostname).mkString("\n")
     val slavesFile = generateTempFile("slaves", slaves)
     val sparkDefaults =
-      s"""|spark.master ${master.hostname}
+      s"""|spark.master spark://${master.hostname}:7077
           |spark.eventLog.enabled true
           |spark.eventLog.dir hdfs:///spark-event-log
           |""".stripMargin
